@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row mb-4">
+                    <!-- Arama çubuğu - Sol taraf -->
+                    <div class="col-md-4">
+                        <div class="search-form">
+                            <div class="input-group">
+                                <input type="text" id="searchInput" class="form-control form-control-lg shadow-none" 
+                                       placeholder="Rehberde ara..." style="border-radius: 25px; padding-left: 20px;">
+                                <button id="clearSearch" class="btn btn-link text-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 4; border: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Butonlar - Sağ taraf -->
+                    <div class="col-md-8 text-end">
+                        {% if current_user.role == 'superadmin' %}
+                        <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addContactModal">
+                            <i class="fas fa-plus me-1"></i>Yeni Kişi Ekle
+                        </button>
+                        <button class="btn btn-danger btn-lg" id="deleteSelectedBtn" style="display: none;">
+                            <i class="fas fa-trash me-1"></i>Seçilenleri Sil
+                        </button>
+                        <button class="btn btn-info btn-lg text-white" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                            <i class="fas fa-file-import me-1"></i>Excel'den İçe Aktar
+                        </button>
+                        <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-lg">
+                            <i class="fas fa-file-excel me-1"></i>Excel'e Aktar
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <form id="deleteForm" action="{{ url_for('delete_selected') }}" method="POST">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    {% if current_user.role == 'superadmin' %}
+                                    <th>
+                                        <input type="checkbox" id="selectAll" class="form-check-input">
+                                    </th>
+                                    {% endif %}
+                                    <th>Ad Soyad</th>
+                                    <th>Telefon</th>
+                                    <th>Görev</th>
+                                    <th>Kurum</th>
+                                    {% if current_user.role == 'superadmin' %}
+                                    <th>İşlemler</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contact in contacts %}
+                                <tr>
+                                    {% if current_user.role == 'superadmin' %}
+                                    <td>
+                                        <input type="checkbox" name="contact_ids[]" value="{{ contact.id }}" class="form-check-input contact-checkbox">
+                                    </td>
+                                    {% endif %}
+                                    <td>{{ contact.ad_soyad }}</td>
+                                    <td>
+                                        <a href="tel:+90{{ contact.telefon }}" class="text-decoration-none phone-link">
+                                            <i class="fas fa-phone me-1 text-success"></i>{{ contact.telefon }}
+                                        </a>
+                                    </td>
+                                    <td>{{ contact.gorev }}</td>
+                                    <td>{{ contact.kurum }}</td>
+                                    {% if current_user.role == 'superadmin' %}
+                                    <td>
+                                        <button class="btn btn-warning btn-sm edit-contact" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editContactModal"
+                                                data-id="{{ contact.id }}"
+                                                data-ad-soyad="{{ contact.ad_soyad }}"
+                                                data-telefon="{{ contact.telefon }}"
+                                                data-gorev="{{ contact.gorev }}"
+                                                data-kurum="{{ contact.kurum }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <a href="{{ url_for('delete_contact', id=contact.id) }}" 
+                                           class="btn btn-danger btn-sm"
+                                           onclick="return confirm('Bu kişiyi silmek istediğinizden emin misiniz?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+
+                {% if num_tabs > 1 %}
+                <div class="mt-4 d-flex justify-content-center">
+                    <nav>
+                        <ul class="pagination pagination-lg">
+                            {% for tab in range(1, num_tabs + 1) %}
+                            <li class="page-item {% if tab == current_tab %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('contacts', tab=tab) }}">{{ tab }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.role == 'superadmin' %}
+<!-- Add Contact Modal -->
+<div class="modal fade" id="addContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Yeni Kişi Ekle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_contact') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ad Soyad</label>
+                        <input type="text" class="form-control" name="ad_soyad" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefon</label>
+                        <input type="tel" class="form-control" name="telefon" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Görev</label>
+                        <input type="text" class="form-control" name="gorev">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kurum</label>
+                        <input type="text" class="form-control" name="kurum">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="modal fade" id="editContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Kişiyi Düzenle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editContactForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ad Soyad</label>
+                        <input type="text" class="form-control" name="ad_soyad" id="edit_ad_soyad" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefon</label>
+                        <input type="tel" class="form-control" name="telefon" id="edit_telefon" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Görev</label>
+                        <input type="text" class="form-control" name="gorev" id="edit_gorev">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kurum</label>
+                        <input type="text" class="form-control" name="kurum" id="edit_kurum">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Güncelle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Import Excel Modal -->
+<div class="modal fade" id="importExcelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Excel'den İçe Aktar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Excel Dosyası</label>
+                        <input type="file" class="form-control" name="excel_file" accept=".xlsx,.xls" required>
+                        <small class="text-muted">Excel dosyanızda "Ad Soyad", "Telefon", "Görev" ve "Kurum" sütunları bulunmalıdır.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">İçe Aktar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Telefon numarası validasyonu
+    function validatePhone(input) {
+        const digits = input.value.replace(/\D/g, '');
+        if (digits.length !== 10) {
+            input.setCustomValidity('Telefon numarası 10 haneli olmalıdır!');
+            return false;
+        }
+        input.setCustomValidity('');
+        return true;
+    }
+
+    // Telefon input alanlarına validasyon ekle
+    const phoneInputs = document.querySelectorAll('input[name="telefon"]');
+    phoneInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            // Sadece rakam girişine izin ver
+            this.value = this.value.replace(/\D/g, '');
+            validatePhone(this);
+        });
+
+        input.addEventListener('invalid', function() {
+            if (this.value === '') {
+                this.setCustomValidity('Telefon numarası gereklidir!');
+            } else {
+                validatePhone(this);
+            }
+        });
+    });
+
+    // Edit contact modal data handling
+    const editButtons = document.querySelectorAll('.edit-contact');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const adSoyad = this.dataset.adSoyad;
+            const telefon = this.dataset.telefon;
+            const gorev = this.dataset.gorev;
+            const kurum = this.dataset.kurum;
+
+            document.getElementById('edit_ad_soyad').value = adSoyad;
+            document.getElementById('edit_telefon').value = telefon;
+            document.getElementById('edit_gorev').value = gorev;
+            document.getElementById('edit_kurum').value = kurum;
+
+            const form = document.getElementById('editContactForm');
+            form.action = `/update_contact/${id}`;
+        });
+    });
+
+    // Select all checkbox handling
+    const selectAllCheckbox = document.getElementById('selectAll');
+    selectAllCheckbox.addEventListener('change', function() {
+        const contactCheckboxes = document.querySelectorAll('.contact-checkbox');
+        contactCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+
+        if (this.checked) {
+            document.getElementById('deleteSelectedBtn').style.display = 'block';
+        } else {
+            document.getElementById('deleteSelectedBtn').style.display = 'none';
+        }
+    });
+
+    // Delete selected contacts handling
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    deleteSelectedBtn.addEventListener('click', function() {
+        const deleteForm = document.getElementById('deleteForm');
+        deleteForm.submit();
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    const clearSearch = document.getElementById('clearSearch');
+    const tableRows = document.querySelectorAll('table tbody tr');
+
+    function filterTable(searchText) {
+        searchText = searchText.toLowerCase();
+        tableRows.forEach(row => {
+            const adSoyad = row.cells[row.cells.length - 5].textContent.toLowerCase();
+            const telefon = row.cells[row.cells.length - 4].textContent.toLowerCase();
+            const gorev = row.cells[row.cells.length - 3].textContent.toLowerCase();
+            const kurum = row.cells[row.cells.length - 2].textContent.toLowerCase();
+
+            if (adSoyad.includes(searchText) || 
+                telefon.includes(searchText) || 
+                gorev.includes(searchText) || 
+                kurum.includes(searchText)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    searchInput.addEventListener('input', function() {
+        filterTable(this.value);
+    });
+
+    clearSearch.addEventListener('click', function() {
+        searchInput.value = '';
+        filterTable('');
+    });
+});
+</script>
+{% endblock %}
